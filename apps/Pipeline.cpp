@@ -45,15 +45,11 @@ Pipeline::Pipeline(GMainLoop *loop, gchar *config_filepath): loop(loop),
 
   tiler = gst_element_factory_make ("nvmultistreamtiler", "nvtiler");
 
-  nvvidconv = gst_element_factory_make ("nvvideoconvert", "nvvideo-converter");
-
   nvosd = gst_element_factory_make ("nvdsosd", "nv-onscreendisplay");
 
   sink = gst_element_factory_make ("nveglglessink", "nvvideo-renderer");
 
-  nv12_filter = gst_element_factory_make ("capsfilter", "nv12-filter");
-
-  if (!pgie || !nvdslogger || !tiler || !nvvidconv || !nvosd || !sink) {
+  if (!pgie || !nvdslogger || !tiler || !nvosd || !sink) {
     auto err_msg = "One element could not be created. Exiting.\n";
     g_printerr ("%s", err_msg);
     throw std::runtime_error(err_msg);
@@ -68,12 +64,6 @@ Pipeline::Pipeline(GMainLoop *loop, gchar *config_filepath): loop(loop),
   THROW_ON_PARSER_ERROR(nvds_parse_tiler(tiler, config_filepath, "tiler"));
   THROW_ON_PARSER_ERROR(nvds_parse_egl_sink(sink, config_filepath, "sink"));
 
-  g_object_set(G_OBJECT(nvvidconv), "nvbuf-memory-type", 3, nullptr);
-
-  GstCaps *nv12_caps = gst_caps_from_string("video/x-raw(memory:NVMM), format=NV12");
-  g_object_set(G_OBJECT(nv12_filter), "caps", nv12_caps, nullptr);
-  gst_caps_unref(nv12_caps);
-
   // register_probs();
 
   GstBus *bus = gst_pipeline_get_bus (GST_PIPELINE (pipeline));
@@ -85,7 +75,7 @@ Pipeline::Pipeline(GMainLoop *loop, gchar *config_filepath): loop(loop),
   }
 
   gst_bin_add_many (GST_BIN (pipeline), streammux, pgie, tracker, nvdslogger, tiler,
-    nvvidconv, nvosd, sink, nv12_filter, NULL);
+    nvosd, sink, NULL);
 
   // link sources to streammux
   for (int i = 0; i < sources.size(); i++) {
@@ -118,7 +108,7 @@ Pipeline::Pipeline(GMainLoop *loop, gchar *config_filepath): loop(loop),
   }
 
   // link the rest of the pipeline
-  if (!gst_element_link_many(streammux, pgie, tracker, nvdslogger, nvvidconv, nv12_filter, tiler, nvosd, sink, NULL)) {
+  if (!gst_element_link_many(streammux, pgie, tracker, nvdslogger, tiler, nvosd, sink, NULL)) {
     auto err_msg = "Elements could not be linked. Exiting.\n";
     g_printerr ("%s", err_msg);
     throw std::runtime_error(err_msg);
@@ -215,14 +205,4 @@ void Pipeline::register_probs() {
   }
 
   gst_object_unref(tiler_sink_pad);
-
-  GstPad *vidconv_src_pad = gst_element_get_static_pad(nvvidconv, "src");
-  if (!vidconv_src_pad) {
-    g_print ("Unable to get vidconv's src pad\n");
-  } else {
-    gst_pad_add_probe (vidconv_src_pad, GST_PAD_PROBE_TYPE_BUFFER,
-      frame_buffer_callback_prob, this, nullptr);
-  }
-
-  gst_object_unref(vidconv_src_pad);
 }

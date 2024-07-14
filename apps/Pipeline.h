@@ -30,11 +30,9 @@ class Pipeline {
     GstElement *sink;
     GstElement *pgie;
     GstElement *tracker;
-    GstElement *nvvidconv;
     GstElement *nvosd;
     GstElement *tiler;
     GstElement *nvdslogger;
-    GstElement *nv12_filter;
 
     Analytic _analytic;
     FrameBuffer _frame_buffer;
