@@ -71,7 +71,7 @@ Pipeline::Pipeline(GMainLoop *loop, gchar *config_filepath): loop(loop),
     "config-file", NVDSANALYTICS_CONFIG_FILE,
     NULL);
 
-  // register_probs();
+  register_probs();
 
   GstBus *bus = gst_pipeline_get_bus (GST_PIPELINE (pipeline));
   bus_watch_id = gst_bus_add_watch (bus, pipeline_bus_watch, loop);
