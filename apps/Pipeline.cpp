@@ -21,6 +21,7 @@
   }
 
 constexpr int MAX_FRAME_BUFFER_SIZE = 300;
+constexpr char *NVDSANALYTICS_CONFIG_FILE = "config/config_nvdsanalytics.txt";
 
 Pipeline::Pipeline(GMainLoop *loop, gchar *config_filepath): loop(loop),
   _frame_buffer(MAX_FRAME_BUFFER_SIZE) {
@@ -41,6 +42,8 @@ Pipeline::Pipeline(GMainLoop *loop, gchar *config_filepath): loop(loop),
 
   tracker = gst_element_factory_make ("nvtracker", "tracker");
 
+  nvdsanalytics = gst_element_factory_make ("nvdsanalytics", "analytics");
+
   nvdslogger = gst_element_factory_make ("nvdslogger", "nvdslogger");
 
   tiler = gst_element_factory_make ("nvmultistreamtiler", "nvtiler");
@@ -49,7 +52,7 @@ Pipeline::Pipeline(GMainLoop *loop, gchar *config_filepath): loop(loop),
 
   sink = gst_element_factory_make ("nveglglessink", "nvvideo-renderer");
 
-  if (!pgie || !nvdslogger || !tiler || !nvosd || !sink) {
+  if (!pgie || !tracker || !nvdsanalytics || !nvdslogger || !tiler || !nvosd || !sink) {
     auto err_msg = "One element could not be created. Exiting.\n";
     g_printerr ("%s", err_msg);
     throw std::runtime_error(err_msg);
@@ -64,6 +67,10 @@ Pipeline::Pipeline(GMainLoop *loop, gchar *config_filepath): loop(loop),
   THROW_ON_PARSER_ERROR(nvds_parse_tiler(tiler, config_filepath, "tiler"));
   THROW_ON_PARSER_ERROR(nvds_parse_egl_sink(sink, config_filepath, "sink"));
 
+  g_object_set (G_OBJECT (nvdsanalytics),
+    "config-file", NVDSANALYTICS_CONFIG_FILE,
+    NULL);
+
   // register_probs();
 
   GstBus *bus = gst_pipeline_get_bus (GST_PIPELINE (pipeline));
@@ -74,7 +81,7 @@ Pipeline::Pipeline(GMainLoop *loop, gchar *config_filepath): loop(loop),
     gst_bin_add (GST_BIN (pipeline), source);
   }
 
-  gst_bin_add_many (GST_BIN (pipeline), streammux, pgie, tracker, nvdslogger, tiler,
+  gst_bin_add_many (GST_BIN (pipeline), streammux, pgie, tracker, nvdsanalytics, nvdslogger, tiler,
     nvosd, sink, NULL);
 
   // link sources to streammux
@@ -108,7 +115,7 @@ Pipeline::Pipeline(GMainLoop *loop, gchar *config_filepath): loop(loop),
   }
 
   // link the rest of the pipeline
-  if (!gst_element_link_many(streammux, pgie, tracker, nvdslogger, tiler, nvosd, sink, NULL)) {
+  if (!gst_element_link_many(streammux, pgie, tracker, nvdsanalytics, nvdslogger, tiler, nvosd, sink, NULL)) {
     auto err_msg = "Elements could not be linked. Exiting.\n";
     g_printerr ("%s", err_msg);
     throw std::runtime_error(err_msg);

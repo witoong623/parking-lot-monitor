@@ -1,5 +1,5 @@
 ################################################################################
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -20,44 +20,27 @@
 # DEALINGS IN THE SOFTWARE.
 ################################################################################
 
-source-list:
-  #semicolon separated uri. For ex- uri1;uri2;uriN;
-  # list: file:///opt/nvidia/deepstream/deepstream/samples/streams/sample_1080p_h264.mp4;
-  list: file:///home/triton-server/parking-lot-monitor/videos/2020-03-19-08-00-00_scene_0013_BB_write.avi;
-  
+# The values in the config file are overridden by values set through GObject
+# properties.
 
-streammux:
-  batch-size: 1
-  live-source: 0
-  batched-push-timeout: 40000
-  # don't scale the input frame
-  width: 1280
-  height: 960
+[property]
+enable=1
+#Width height used for configuration to which below configs are configured
+config-width=1280
+config-height=960
+#osd-mode 0: Dont display any lines, rois and text
+#         1: Display only lines, rois and static text i.e. labels
+#         2: Display all info from 1 plus information about counts
+osd-mode=2
+#Set OSD font size that has to be displayed
+display-font-size=12
 
-tracker:
-  tracker-width: 960
-  tracker-height: 544
-  gpu-id: 0
-  ll-lib-file: /opt/nvidia/deepstream/deepstream/lib/libnvds_nvmultiobjecttracker.so
-  ll-config-file: /opt/nvidia/deepstream/deepstream-6.4/samples/configs/deepstream-app/config_tracker_NvDCF_perf.yml
-
-osd:
-  process-mode: 1
-  display-text: 1
-
-tiler:
-  width: 1280
-  height: 960
-
-sink:
-  qos: 0
-
-# Inference using nvinfer:
-primary-gie:
-  plugin-type: 0
-  config-file-path: dstest3_pgie_config.yml
-
-## Inference using nvinferserver:
-#primary-gie:
-#  plugin-type: 1
-#  config-file-path: dstest3_pgie_nvinferserver_config.txt
+## Per stream configuration
+[roi-filtering-stream-0]
+#enable or disable following feature
+enable=1
+#ROI to filter select objects, and remove from meta data
+roi-RF=0;431; 246;129; 452;129; 243;949; 0;949
+#remove objects in the ROI
+inverse-roi=0
+class-id=-1

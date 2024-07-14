@@ -31,7 +31,7 @@ class Pipeline {
     GstElement *nvosd;
     GstElement *tiler;
     GstElement *nvdslogger;
-    GstElement *analytics;
+    GstElement *nvdsanalytics;
 
     FrameBuffer _frame_buffer;
     std::vector<GstElement *> sources;
