@@ -97,44 +97,5 @@ GstPadProbeReturn analytics_callback_tiler_prob (GstPad *pad, GstPadProbeInfo *i
   GstBuffer *buf = static_cast<GstBuffer *>(info->data);
   NvDsBatchMeta *batch_meta = gst_buffer_get_nvds_batch_meta (buf);
 
-  pipeline->analytic().update_analytic_state(batch_meta);
-  pipeline->analytic().draw_on_frame (batch_meta);
-
-  return GST_PAD_PROBE_OK;
-}
-
-GstPadProbeReturn frame_buffer_callback_prob (GstPad *pad, GstPadProbeInfo *info, gpointer user_data) {
-  // https://forums.developer.nvidia.com/t/deepstream-sample-code-snippet/142683
-  Pipeline *pipeline = static_cast<Pipeline *>(user_data);
-  GstBuffer *buf = static_cast<GstBuffer *>(info->data);
-  NvDsBatchMeta *batch_meta = gst_buffer_get_nvds_batch_meta (buf);
-  NvDsFrameMeta *frame_meta = nvds_get_nth_frame_meta (batch_meta->frame_meta_list, 0);
-
-  GstMapInfo in_map_info;
-  if (!gst_buffer_map (buf, &in_map_info, GST_MAP_READ)) {
-    g_printerr ("Error: Failed to map gst buffer\n");
-    gst_buffer_unmap (buf, &in_map_info);
-    return GST_PAD_PROBE_OK;
-  }
-
-  NvBufSurface *surface = (NvBufSurface *)in_map_info.data;
-
-  if (NvBufSurfaceMap(surface, frame_meta->batch_id, -1, NVBUF_MAP_READ) != 0) {
-    g_printerr("Error: Failed to map surface\n");
-  }
-
-  // data size 3317760, color 33, pitch 2048
-  // neeed CV_YUV2BGRA_NV12 to convert to BGRA
-  cv::Mat cv_frame = cv::Mat(surface->surfaceList[frame_meta->batch_id].height * 3 / 2,
-                             surface->surfaceList[frame_meta->batch_id].width,
-                             CV_8UC1,
-                             surface->surfaceList[frame_meta->batch_id].mappedAddr.addr[0],
-                             surface->surfaceList[frame_meta->batch_id].pitch);
-
-  pipeline->frame_buffer().buffer_frame(frame_meta->source_id, frame_meta->frame_num, cv_frame.clone());
-
-  NvBufSurfaceUnMap(surface, frame_meta->batch_id, -1);
-  gst_buffer_unmap(buf, &in_map_info);
-
   return GST_PAD_PROBE_OK;
 }

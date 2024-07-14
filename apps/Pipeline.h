@@ -16,8 +16,6 @@ class Pipeline {
 
     guint bus_watch_id;
     GstElement *pipeline;
-    inline Analytic &analytic() { return _analytic; }
-    inline FrameBuffer &frame_buffer() { return _frame_buffer; }
   private:
     std::vector<GstElement *> create_sources(gchar *config_filepath);
     GstElement *create_source_bin (guint index, gchar *uri);
@@ -33,8 +31,8 @@ class Pipeline {
     GstElement *nvosd;
     GstElement *tiler;
     GstElement *nvdslogger;
+    GstElement *analytics;
 
-    Analytic _analytic;
     FrameBuffer _frame_buffer;
     std::vector<GstElement *> sources;
 };
