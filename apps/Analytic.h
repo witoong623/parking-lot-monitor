@@ -14,6 +14,8 @@ struct ParkingState {
   unsigned long object_id;
   std::chrono::time_point<std::chrono::system_clock> first_seen;
   std::chrono::time_point<std::chrono::system_clock> last_seen;
+  // last frame number that see it in parking lot
+  int last_seen_frame_num;
 };
 
 

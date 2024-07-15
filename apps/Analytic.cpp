@@ -18,51 +18,6 @@ constexpr guint MAX_DISPLAY_LEN = 64;
 
 Analytic::Analytic() {}
 
-// void Analytic::draw_on_frame(NvDsBatchMeta *batch_meta) {
-//   // TODO: drawing based on configuration for each source
-//   NvDsFrameMeta *frame_meta = nvds_get_nth_frame_meta (batch_meta->frame_meta_list, 0);
-
-//   NvDsDisplayMeta *display_meta = nvds_acquire_display_meta_from_pool(batch_meta);
-
-//   // drawing configuration
-//   NvOSD_LineParams *line_params = &display_meta->line_params[0];
-//   // coordinate is coordinate after frame is resized from streammux
-//   line_params->x1 = 100;
-//   line_params->y1 = 440;
-//   line_params->x2 = 1800;
-//   line_params->y2 = 440;
-//   line_params->line_width = 5;
-//   // default values are 0, which make it invisible due to alpha = 0
-//   line_params->line_color = (NvOSD_ColorParams){1.0, 0.0, 0.0, 1.0};
-//   display_meta->num_lines++;
-
-//   // drawing result of analytics
-//   NvOSD_TextParams *text_params = &display_meta->text_params[0];
-//   display_meta->num_labels++;
-//   text_params->display_text = static_cast<char*>(g_malloc0(MAX_DISPLAY_LEN));
-//   std::snprintf(text_params->display_text, MAX_DISPLAY_LEN, "In: %lu, Out: %lu",
-//                 line_crossing_infos[FIRST_SOURCE][0].crossing_direction_counts[LineCrossDirection::RightToLeft],
-//                 line_crossing_infos[FIRST_SOURCE][0].crossing_direction_counts[LineCrossDirection::LeftToRight]);
-
-//   text_params->x_offset = 100;
-//   text_params->y_offset = 440;
-
-//   text_params->font_params.font_name = "Serif";
-//   text_params->font_params.font_size = 12;
-//   text_params->font_params.font_color.red = 1.0;
-//   text_params->font_params.font_color.green = 1.0;
-//   text_params->font_params.font_color.blue = 1.0;
-//   text_params->font_params.font_color.alpha = 1.0;
-
-//   text_params->set_bg_clr = TRUE;
-//   text_params->text_bg_clr.red = 0.0;
-//   text_params->text_bg_clr.green = 0.0;
-//   text_params->text_bg_clr.blue = 0.0;
-//   text_params->text_bg_clr.alpha = 1.0;
-
-//   nvds_add_display_meta_to_frame(frame_meta, display_meta);
-// }
-
 void Analytic::update_parking_state(NvDsBatchMeta *batch_meta) {
   NvDsFrameMeta *frame_meta = nvds_get_nth_frame_meta(batch_meta->frame_meta_list, 0);
   NvDsMetaList *l_obj = nullptr;
@@ -72,6 +27,7 @@ void Analytic::update_parking_state(NvDsBatchMeta *batch_meta) {
     NvDsObjectMeta *obj_meta = (NvDsObjectMeta *)(l_obj->data);
     // each item here must be car since I already fixed it in PGIE config
 
+    bool in_roi = false;
     // Access attached user meta for each object
     for (NvDsMetaList *l_user_meta = obj_meta->obj_user_meta_list; l_user_meta != NULL;
          l_user_meta = l_user_meta->next) {
@@ -87,15 +43,61 @@ void Analytic::update_parking_state(NvDsBatchMeta *batch_meta) {
             // object is already in the parking_states
             parking_states[obj_meta->object_id].last_seen = std::chrono::system_clock::now();
           }
+
+          in_roi = true;
+          parking_states[obj_meta->object_id].last_seen_frame_num = frame_meta->frame_num;
         }
       }
     }
 
-  // remove stale objects
-  // auto stale_object = std::remove_if(parking_states.begin(), parking_states.end(), [frame_meta](const auto &parking_state) {
-  //   return frame_meta->ntp_timestamp - parking_state.second.last_seen > STALE_OBJECT_THRESHOLD;
-  // });
+    if (!in_roi) {
+      continue;
+    }
 
-  // parking_states.erase(stale_object, parking_states.end());
+    auto parking_state = parking_states[obj_meta->object_id];
+    auto parking_duration = std::chrono::duration_cast<std::chrono::seconds>(parking_state.last_seen - parking_state.first_seen).count();
+
+    auto min = parking_duration / 60;
+    auto sec = parking_duration % 60;
+
+    NvDsDisplayMeta *display_meta = nvds_acquire_display_meta_from_pool(batch_meta);
+    display_meta->num_labels++;
+
+    NvOSD_TextParams *text_params = &display_meta->text_params[0];
+    text_params->display_text = static_cast<char*>(g_malloc0(MAX_DISPLAY_LEN));
+    std::snprintf(text_params->display_text, MAX_DISPLAY_LEN, "Park for %ld:%ld", min, sec);
+
+    auto x = obj_meta->detector_bbox_info.org_bbox_coords.left;
+    auto y = obj_meta->detector_bbox_info.org_bbox_coords.top;
+    auto width = obj_meta->detector_bbox_info.org_bbox_coords.width;
+    auto height = obj_meta->detector_bbox_info.org_bbox_coords.height;
+
+    text_params->x_offset = x + (width / 2);
+    text_params->y_offset = y - 14;
+
+    text_params->font_params.font_name = "Serif";
+    text_params->font_params.font_size = 12;
+    text_params->font_params.font_color.red = 1.0;
+    text_params->font_params.font_color.green = 1.0;
+    text_params->font_params.font_color.blue = 1.0;
+    text_params->font_params.font_color.alpha = 1.0;
+
+    text_params->set_bg_clr = TRUE;
+    text_params->text_bg_clr.red = 0.0;
+    text_params->text_bg_clr.green = 0.0;
+    text_params->text_bg_clr.blue = 0.0;
+    text_params->text_bg_clr.alpha = 1.0;
+
+    nvds_add_display_meta_to_frame(frame_meta, display_meta);
+  }
+
+  // remove stale objects
+  auto it = parking_states.begin();
+  while (it != parking_states.end()) {
+    if (frame_meta->frame_num - it->second.last_seen_frame_num > STALE_OBJECT_THRESHOLD) {
+      parking_states.erase(it++);
+    } else {
+      ++it;
+    }
   }
 }
